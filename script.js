@@ -7,7 +7,7 @@ if (!window.location.pathname.endsWith('/')) {
     window.location.replace(window.location.pathname + '/' + window.location.search + window.location.hash);
   }
 
-  console.log(PACKS_URL);
+  
 
 function parseDelimited(text) {
     const lines = text.trim().split(/\r?\n/);
@@ -134,4 +134,5 @@ function render({ packs, emoticons }) {
 (async function main() {
     const data = await loadData();
     render(data);
+    console.log("test");
 })();
