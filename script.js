@@ -40,13 +40,14 @@ function parseDelimited(text) {
 /*********************
  * URL HELPERS
  *********************/
-// segment 단위로 안전하게 인코딩해서 경로 조합
 function joinPathEncoded(...parts) {
-  return parts
-    .map(p => encodeURIComponent(p).replaceAll("%2F", "/"))
-    .join("/")
-    .replaceAll("%2F", "/");
-}
+    return parts
+      .map(p =>
+        encodeURIComponent(p.normalize("NFC"))
+      )
+      .join("/");
+  }
+  
 
 // BASE 기준으로 최종 URL 만들기 (GitHub Pages 하위경로 대응)
 function toAbsUrl(pathLike) {
@@ -55,32 +56,23 @@ function toAbsUrl(pathLike) {
 
 // NFC/NFD 둘 다 만들어서 "존재하는 쪽"을 선택 (HEAD로 확인)
 async function pickExistingImageUrl(packTitle, fileName) {
-  // 후보 4개: (pack NFC/NFD) x (file NFC/NFD)
-  const pNFC = (packTitle ?? "").normalize("NFC");
-  const pNFD = (packTitle ?? "").normalize("NFD");
-  const fNFC = (fileName ?? "").normalize("NFC");
-  const fNFD = (fileName ?? "").normalize("NFD");
-
-  const candidates = [
-    joinPathEncoded("images", pNFC, fNFC),
-    joinPathEncoded("images", pNFC, fNFD),
-    joinPathEncoded("images", pNFD, fNFC),
-    joinPathEncoded("images", pNFD, fNFD),
-  ].map(toAbsUrl);
-
-  // HEAD로 존재 확인 (GitHub Pages는 HEAD 지원함)
-  for (const url of candidates) {
+    // 일단 화면/레포에서 일반적으로 쓰는 NFC로 강제
+    const pack = String(packTitle ?? "").normalize("NFC");
+    const file = String(fileName ?? "").normalize("NFC");
+  
+    // GitHub Pages 하위경로 안전 + 한글/공백 안전
+    const url = new URL(encodeURI(`images/${pack}/${file}`), BASE).href;
+  
+    // 존재 확인
     try {
       const res = await fetch(url, { method: "HEAD", cache: "no-store" });
       if (res.ok) return url;
-    } catch (_) {
-      // 네트워크 예외는 무시하고 다음 후보로
-    }
+    } catch (_) {}
+  
+    // 실패하면 디버그용으로 url 반환
+    return url;
   }
-
-  // 다 실패하면 첫 후보라도 반환(디버깅용)
-  return candidates[0];
-}
+  
 
 /*********************
  * LOAD DATA
@@ -235,5 +227,6 @@ function decodeURIComponentSafe(url) {
     console.log("rendered");
   } catch (e) {
     console.error("main error", e);
+    onsole.log(img.src);
   }
 })();
