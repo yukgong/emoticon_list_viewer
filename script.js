@@ -1,12 +1,13 @@
 const BASE = new URL('.', window.location.href);
 
-const PACKS_URL = new URL("data/emoticon_pack.csv", BASE);
-const EMOS_URL  = new URL("data/emoticons.csv", BASE);
+const PACKS_URL = new URL("./data/emoticon_pack.csv", BASE);
+const EMOS_URL  = new URL("./data/emoticons.csv", BASE);
 
 if (!window.location.pathname.endsWith('/')) {
     window.location.replace(window.location.pathname + '/' + window.location.search + window.location.hash);
   }
-  
+
+  console.log(PACKS_URL);
 
 function parseDelimited(text) {
     const lines = text.trim().split(/\r?\n/);
