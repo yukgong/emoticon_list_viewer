@@ -13,8 +13,45 @@ if (!window.location.pathname.endsWith("/")) {
 }
 
 /*********************
- * CSV/TSV PARSER
+ * CSV/TSV PARSER (따옴표 필드 지원)
  *********************/
+function parseCSVLine(line, delimiter = ",") {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+    
+    if (inQuotes) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          // 이스케이프된 따옴표 ""
+          current += '"';
+          i++;
+        } else {
+          // 따옴표 종료
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === delimiter) {
+        result.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
 function parseDelimited(text) {
   const raw = text.replace(/^\uFEFF/, "").trim(); // BOM 제거
   if (!raw) return [];
@@ -23,12 +60,12 @@ function parseDelimited(text) {
   const headerLine = lines.shift();
   const delimiter = headerLine.includes("\t") ? "\t" : ",";
 
-  const headers = headerLine.split(delimiter).map(h => h.trim());
+  const headers = parseCSVLine(headerLine, delimiter);
 
   return lines
     .filter(line => line.trim().length > 0)
     .map(line => {
-      const cols = line.split(delimiter);
+      const cols = parseCSVLine(line, delimiter);
       const row = {};
       headers.forEach((h, i) => {
         row[h] = (cols[i] ?? "").trim();
@@ -162,32 +199,42 @@ function render({ packs, emoticons }) {
 
     count.textContent = `${filtered.length}개`;
 
-    grid.innerHTML = filtered.map(e => `
-      <div class="card">
-        <img src="${e.imgSrc}" alt="${escapeHtml(e.title)}" loading="lazy"
-             onerror="this.classList.add('broken'); this.alt='이미지 없음';" />
-        <div class="meta">
-          <div class="title">${escapeHtml(e.title)}</div>
-          <div class="pack">${escapeHtml(e.packTitle)}</div>
-          <div class="desc">${escapeHtml(e.description)}</div>
-          <div class="tags">${e.keywords.map(k => `<span>#${escapeHtml(k)}</span>`).join("")}</div>
-          <button class="copy" data-src="${escapeAttr(decodeURIComponentSafe(e.imgSrc))}">경로 복사</button>
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">📭</div>
+          <div class="empty-state-text">검색 결과가 없습니다</div>
+        </div>
+      `;
+      return;
+    }
+
+    grid.innerHTML = `<div class="list-container">${filtered.map(e => `
+      <div class="list-item">
+        <div class="list-item-avatar">
+          <img src="${e.imgSrc}" alt="${escapeHtml(e.title)}" loading="lazy"
+               onerror="this.classList.add('broken'); this.alt='이미지 없음';" />
+        </div>
+        <div class="list-item-content">
+          <div class="list-item-title">${escapeHtml(e.title)}</div>
+          <div class="list-item-pack">${escapeHtml(e.packTitle)}</div>
+          <div class="list-item-meta">
+            <div class="meta-section">
+              <div class="meta-label">설명</div>
+              <div class="meta-description">${escapeHtml(e.description) || '-'}</div>
+            </div>
+            <div class="meta-section meta-keywords">
+              <div class="meta-label">키워드</div>
+              <div class="keywords-list">
+                ${e.keywords.length > 0 
+                  ? e.keywords.map(k => `<span class="keyword-tag">${escapeHtml(k)}</span>`).join("") 
+                  : '<span style="color: rgba(0,0,0,0.25);">-</span>'}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    `).join("");
-
-    grid.querySelectorAll("button.copy").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(btn.dataset.src);
-          const old = btn.textContent;
-          btn.textContent = "복사됨!";
-          setTimeout(() => btn.textContent = old, 800);
-        } catch (e) {
-          console.error("clipboard failed", e);
-        }
-      });
-    });
+    `).join("")}</div>`;
   }
 
   packSelect.addEventListener("change", apply);
@@ -205,14 +252,6 @@ function escapeHtml(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
-}
-function escapeAttr(s) {
-  // attribute용 최소 이스케이프
-  return escapeHtml(s).replaceAll("\n", " ");
-}
-function decodeURIComponentSafe(url) {
-  try { return decodeURIComponent(url); }
-  catch { return url; }
 }
 
 /*********************
