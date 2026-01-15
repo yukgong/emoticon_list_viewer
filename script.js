@@ -37,6 +37,7 @@ async function loadData() {
     const [packsText, emosText] = await Promise.all([
         fetch(PACKS_URL).then(r => r.text()),
         fetch(EMOS_URL).then(r => r.text()),
+        fetch(new URL("./data.json", location.href))
     ]);
 
     const packs = parseDelimited(packsText).map(p => ({
@@ -132,7 +133,14 @@ function render({ packs, emoticons }) {
 }
 
 (async function main() {
-    const data = await loadData();
-    render(data);
-    console.log("test");
-})();
+    try {
+      console.log("main start");
+      const data = await loadData();
+      console.log("loaded", data);
+      render(data);
+      console.log("test");
+    } catch (e) {
+      console.error("main error", e);
+    }
+  })();
+  
